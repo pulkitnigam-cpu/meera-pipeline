@@ -1,0 +1,9 @@
+{
+  "name": "meera-pipeline",
+  "private": true,
+  "description": "Telegram -> Gemini triage -> Google News -> LinkedIn draft in Meera's voice -> human review gate (MESA Case 1)",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@vercel/functions": "^3.9.9"
+  }
+}
