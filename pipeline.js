@@ -30,9 +30,12 @@ const saveState = (s) => fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2)
 const log = (event, data) => fs.appendFileSync(LOG_FILE, JSON.stringify({ ts: new Date().toISOString(), event, ...data }) + '\n');
 
 // ---------- Gemini ----------
+// fetch with one retry: flaky wifi shows up as "fetch failed"
+const fetchRetry = (url, opts) => fetch(url, opts).catch(() => new Promise(r => setTimeout(r, 2000)).then(() => fetch(url, opts)));
+
 async function gemini(system, user, { temperature = 0.7 } = {}) {
   if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY missing in .env');
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const res = await fetchRetry(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
     body: JSON.stringify({
@@ -57,7 +60,8 @@ Publishability score 0-10:
 7-8 = strong kernel, needs shaping
 5-6 = usable only if paired with a current news angle
 3-4 = vague, generic, or mostly a feeling
-0-2 = not publishable (private, logistical, a to-do, or would require claims she can't support)
+0-2 = not publishable (private, logistical, a to-do, would require claims she can't support, or outside skincare/cosmetics/her brand entirely)
+If the note is phrased as a request ("give me a draft about X", "write on Y"), do NOT penalise the phrasing: score the topic X/Y on how well it fits her expertise and how specific it is. A broad on-brand topic with no detail is 5-6; an off-brand topic stays 0-2.
 Return JSON: {"score": int, "category": string, "reason": string (one sentence), "angle": string (the one point the post should make), "keywords": [2-3 short Google News search terms, specific to skincare/cosmetics/India where relevant]}`;
   return gemini(system, `NOTE:\n${note}`, { temperature: 0.2 });
 }
@@ -141,7 +145,7 @@ async function fetchNews(keywords, { days = 14, max = 3 } = {}) {
 
 // ---------- Telegram ----------
 async function tg(method, body) {
-  const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, {
+  const res = await fetchRetry(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}),
   });
   const j = await res.json();
